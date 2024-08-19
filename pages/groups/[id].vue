@@ -53,9 +53,13 @@
 
         <div class="form-group">
           <label for="owner" class="form-label">Select File Owner: </label>
-          <select v-model="selectedOwner" id="owner" class="form-control" required>
+          <select v-if="data" v-model="selectedOwner" id="owner" class="form-control" required>
             <option :value="data.person1">{{ data.person1 }}</option>
             <option :value="data.person2">{{ data.person2 }}</option>
+          </select>
+          <!-- Loading state for select -->
+          <select v-else class="form-control" disabled>
+            <option>Loading options...</option>
           </select>
         </div>
 
@@ -66,7 +70,7 @@
     </div>
 
     <!-- Uploaded Files Section -->
-    <div class="uploaded-files-section">
+    <div class="uploaded-files-section" v-if="data">
       <h2>Uploaded Files</h2>
       <div class="file-balances">
         <div class="balance-item">
@@ -75,21 +79,48 @@
         <div class="balance-item">
           <p><strong>{{ data.person2 }}'s File Balance:</strong> {{ fileBalancePerson2.toFixed(2) }}</p>
         </div>
+        <div class="table-container">
+          <table class="file-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>ID</th>
+                <th>Owner</th>
+                <th>Bank</th>
+                <th>Upload Date</th>
+                <th>{{ data.person1 }}'s Balance</th>
+                <th>{{ data.person2 }}'s Balance</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="file in files" :key="file.id" @click="fetchTransactions(file)"
+                :class="{ 'selected-file': file.id === activeFile }" class="file-row">
+                <td>{{ file.name }}</td>
+                <td>{{ file.id }}</td>
+                <td>{{ file.owner }}</td>
+                <td>{{ file.bank }}</td>
+                <td>{{ file.upload_date }}</td>
+                <td>{{ file.balance_person1.toFixed(2) }}</td>
+                <td>{{ file.balance_person2.toFixed(2) }}</td>
+                <td>
+                  <button class="btn btn-primary" @click.stop="fetchTransactions(file)">View Transactions</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-
-      <ul class="file-list">
-        <li v-for="file in files" :key="file.id">
-          <button @click="fetchTransactions(file)" :class="{ 'selected-file': file.id === activeFile }"
-            class="file-button">
-            {{ file.name }} (ID: {{ file.id }}, Owner: {{ file.owner }})
-          </button>
-        </li>
-      </ul>
-      <div class="form-actions">
-        <button @click="queryPastSelections" class="btn btn-secondary">Auto-Fill Actions Based on Past Selections</button>
-      </div>
+        <div class="form-actions">
+          <button @click="queryPastSelections" class="btn btn-secondary">Auto-Fill Actions Based on Past
+            Selections</button>
+        </div>
 
     </div>
+
+    <!-- Loading state -->
+    <div v-else class="loading-message">Loading files...</div>
+
 
     <!-- Transactions Table Section -->
     <h2>Transactions</h2>
@@ -160,6 +191,7 @@ const { data, pending, error } = useFetch(`${config.public.apiBaseUrl}/groups/${
     console.error('Error fetching group details:', response)
   }
 })
+
 
 const activeFile = ref(0)
 const selectedOwner = ref(null)
@@ -258,7 +290,7 @@ const queryPastSelections = async () => {
       if (pastActions[transaction.description]) {
         // sets the past action as the current action
         transaction.action = pastActions[transaction.description];
-        
+
         //updates the balance (the past action is now the new action)
         handleActionChange(transaction, pastActions[transaction.description]);
       }
@@ -465,6 +497,7 @@ async function submitResults() {
 }
 
 onMounted(() => {
+  // console.log('Data on mount: ', data) 
   fetchFiles()
   fetchGroupBalance()
   if (files.value.length > 0) {
@@ -476,7 +509,9 @@ onMounted(() => {
 <style scoped>
 /* Existing styles */
 
-.group-details, .upload-section, .uploaded-files-section {
+.group-details,
+.upload-section,
+.uploaded-files-section {
   background-color: #ffffff;
   padding: 20px;
   border-radius: 10px;
@@ -486,7 +521,8 @@ onMounted(() => {
 }
 
 /* Add a more card-like style */
-.balances, .file-balances {
+.balances,
+.file-balances {
   padding: 10px;
   border: 1px solid #eee;
   border-radius: 5px;
@@ -510,7 +546,8 @@ onMounted(() => {
   font-weight: bold;
 }
 
-.upload-form, .file-list {
+.upload-form,
+.file-list {
   width: 100%;
 }
 
@@ -563,23 +600,6 @@ table {
   margin-top: 10px;
 }
 
-th,
-td {
-  padding: 12px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-
-th {
-  background-color: #007bff;
-  color: white;
-  text-align: center;
-}
-
-td {
-  text-align: center;
-}
-
 .submit-button {
   width: 100%;
   padding: 10px 0;
@@ -595,6 +615,50 @@ td {
 
 .submit-button:hover {
   background-color: #0056b3;
+}
+
+.table-container {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+th, td {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background-color: #007bff;
+  color: white;
+  text-align: center;
+}
+
+td {
+  text-align: center;
+}
+
+.file-row:hover {
+  background-color: #f4f4f4;
+  cursor: pointer;
+}
+
+.selected-file {
+  background-color: #007bff72 !important;
+  color: white;
+}
+
+.form-actions {
+  margin-top: 20px;
+  text-align: center;
 }
 
 </style>
