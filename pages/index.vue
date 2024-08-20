@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>Home Page</h1>
+    <h1>Groups</h1>
     <div v-if="error">{{ error.message }}</div>
     <div v-if="pending">Loading...</div>
     <ul v-if="data && data.length">
@@ -14,7 +14,8 @@
       <input v-model="newGroupName" placeholder="Group Name" required />
       <input v-model="newPerson1" placeholder="Person 1" required />
       <input v-model="newPerson2" placeholder="Person 2" required />
-      <button type="submit">Create Group</button>
+      <Button label="Check" icon="pi pi-check" @click="createGroup"/>
+
     </form>
   </div>
 </template>

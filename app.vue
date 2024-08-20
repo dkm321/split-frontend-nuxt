@@ -16,7 +16,9 @@
 </template>
 
 <script setup>
-// You can add any setup code here if needed
+
+import 'primeicons/primeicons.css'
+
 </script>
 
 <style scoped>

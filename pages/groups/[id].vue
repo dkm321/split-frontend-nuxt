@@ -42,143 +42,172 @@
       </div>
     </div>
 
-    <!-- Upload CSV Section -->
-    <div class="upload-section">
-      <h2>Upload CSV File</h2>
-      <form @submit.prevent="uploadFile" class="upload-form">
-        <div class="form-group">
-          <label for="file-upload" class="form-label">Choose a CSV File: </label>
-          <input type="file" id="file-upload" @change="handleFileChange" class="form-control" required />
+    <!-- Files Section -->
+    <div class="uploaded-files-section">
+      <h2>Files</h2>
+      <div v-if="data" class="card flex gap-4 items-center justify-between flex-wrap">
+        <Toast />
+
+        <!-- File Upload Section -->
+        <div class="flex-1">
+          <div class="file-upload-wrapper">
+            <FileUpload ref="fileupload" mode="basic" name="file" :customUpload="true" accept=".csv" :auto="false"
+              @select="handleFileChange" @upload="onUpload" :disabled="uploadPending" chooseLabel="Choose CSV File"
+              uploadLabel="Upload" cancelLabel="Cancel" />
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="owner" class="form-label">Select File Owner: </label>
-          <select v-if="data" v-model="selectedOwner" id="owner" class="form-control" required>
-            <option :value="data.person1">{{ data.person1 }}</option>
-            <option :value="data.person2">{{ data.person2 }}</option>
-          </select>
-          <!-- Loading state for select -->
-          <select v-else class="form-control" disabled>
-            <option>Loading options...</option>
-          </select>
+        <!-- Owner Selection Dropdown -->
+        <div class="flex-1">
+          <div class="owner-select-wrapper">
+            <Select v-model="uploadOwner" :options="owners" optionLabel="name" placeholder="Select Owner"
+              class="w-full md:w-14rem" :disabled="uploadPending" />
+          </div>
         </div>
 
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Upload</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Uploaded Files Section -->
-    <div class="uploaded-files-section" v-if="data">
-      <h2>Uploaded Files</h2>
-      <div class="file-balances">
-        <div class="balance-item">
-          <p><strong>{{ data.person1 }}'s File Balance:</strong> {{ fileBalancePerson1.toFixed(2) }}</p>
-        </div>
-        <div class="balance-item">
-          <p><strong>{{ data.person2 }}'s File Balance:</strong> {{ fileBalancePerson2.toFixed(2) }}</p>
-        </div>
-        <div class="table-container">
-          <table class="file-table">
-            <thead>
-              <tr>
-                <th>File Name</th>
-                <th>ID</th>
-                <th>Owner</th>
-                <th>Bank</th>
-                <th>Upload Date</th>
-                <th>{{ data.person1 }}'s Balance</th>
-                <th>{{ data.person2 }}'s Balance</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="file in files" :key="file.id" @click="fetchTransactions(file)"
-                :class="{ 'selected-file': file.id === activeFile }" class="file-row">
-                <td>{{ file.name }}</td>
-                <td>{{ file.id }}</td>
-                <td>{{ file.owner }}</td>
-                <td>{{ file.bank }}</td>
-                <td>{{ file.upload_date }}</td>
-                <td>{{ file.balance_person1.toFixed(2) }}</td>
-                <td>{{ file.balance_person2.toFixed(2) }}</td>
-                <td>
-                  <button class="btn btn-primary" @click.stop="fetchTransactions(file)">View Transactions</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Upload Button -->
+        <div class="flex-1">
+          <div class="upload-button-wrapper">
+            <Button label="Upload File" @click="uploadFile" severity="secondary"
+              :disabled="!selectedFile || !uploadOwner || uploadPending" />
+          </div>
         </div>
       </div>
-        <div class="form-actions">
-          <button @click="queryPastSelections" class="btn btn-secondary">Auto-Fill Actions Based on Past
-            Selections</button>
-        </div>
 
+
+      <div v-if="data && data.person1 && data.person2">
+        <DataTable :value="files" tableStyle="min-width: 50rem" responsiveLayout="scroll" selectionMode="single"
+          v-model:selection="selectedFile" @rowSelect="onRowSelect" @rowUnselect="onRowUnselect">
+          <Column field="id" header="ID"></Column>
+          <Column field="name" header="File Name"></Column>
+          <Column field="owner" header="Owner"></Column>
+          <Column field="uploadDate" header="Upload Date"></Column>
+          <Column field="balance_person1" :header="`${data.person1}'s Balance`"></Column>
+          <Column field="balance_person2" :header="`${data.person2}'s Balance`"></Column>
+          <Column header="Actions">
+            <template #body="slotProps">
+              <Button 
+                icon="pi pi-trash" 
+                class="p-button-danger" 
+                @click="confirmDeleteFile(slotProps.data)"
+              />
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+
+      <!-- Loading state -->
+      <div v-else class="loading-message">Loading files...</div>
     </div>
-
-    <!-- Loading state -->
-    <div v-else class="loading-message">Loading files...</div>
-
 
     <!-- Transactions Table Section -->
-    <h2>Transactions</h2>
-    <div v-if="uploadError" class="error">{{ uploadError }}</div>
-    <div v-if="uploadPending">Uploading...</div>
-    <div class="table-container">
-      <table v-if="transactions.length > 0">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Amount</th>
-            <th>Ignore</th>
-            <th>Split 50/50</th>
-            <th>Charge {{ data.person1 }}</th>
-            <th>Charge {{ data.person2 }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(transaction, index) in transactions" :key="index">
-            <td>{{ transaction.date }}</td>
-            <td>{{ transaction.description }}</td>
-            <td>{{ transaction.amount }}</td>
-            <td>
-              <input type="radio" :name="'action' + index" value="Ignore" v-model="transaction.action"
-                @change="handleActionChange(transaction, 'Ignore')" />
-            </td>
-            <td>
-              <input type="radio" :name="'action' + index" value="Split 50/50" v-model="transaction.action"
-                @change="handleActionChange(transaction, 'Split 50/50')" />
-            </td>
-            <td>
-              <input type="radio" :name="'action' + index" :value="`Charge only ${data.person1}`"
-                v-model="transaction.action" @change="handleActionChange(transaction, `Charge only ${data.person1}`)" />
-            </td>
-            <td>
-              <input type="radio" :name="'action' + index" :value="`Charge only ${data.person2}`"
-                v-model="transaction.action" @change="handleActionChange(transaction, `Charge only ${data.person2}`)" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else>
-        <p>No transactions found for this file.</p>
+    <div class="transactions-section">
+      <h2>Transactions</h2>
+      <div v-if="uploadError" class="error">{{ uploadError }}</div>
+      <div v-if="uploadPending">Uploading...</div>
+
+      <div v-if="data">
+        <div class="balance-item">
+          <p><strong>{{ data.person1 }}'s File Balance (Unsubmitted):</strong> {{ fileBalancePerson1.toFixed(2) }}</p>
+        </div>
+        <div class="balance-item">
+          <p><strong>{{ data.person2 }}'s File Balance (Unsubmitted):</strong> {{ fileBalancePerson2.toFixed(2) }}</p>
+        </div>
       </div>
+
+
+      <!-- Action Buttons Section -->
+      <div class="button-actions">
+        <Button label="Auto-Fill Actions Based on Past Selections" @click="queryPastSelections" icon="pi pi-plus"
+          class="p-button-secondary" />
+        <!-- <Button label="Reset All to Ignore" @click="resetAllToIgnore" icon="pi pi-sync" class="p-button-danger" /> -->
+      </div>
+
+      <DataTable v-if="transactions.length > 0" :value="transactions" tableStyle="min-width: 50rem"
+        responsiveLayout="scroll" v-model:filters="filters" scrollable scrollHeight="550px" showGridlines dataKey="id"
+        filterDisplay="menu" :loading="loading" :globalFilterFields="['date', 'description', 'amount']">
+        <template #header>
+          <div class="header-container">
+            <Button type="button" icon="pi pi-filter-slash" label="Clear Filters" outlined @click="clearFilter()" />
+            <IconField class="search-container">
+              <InputIcon>
+                <i class="pi pi-search" />
+              </InputIcon>
+              <InputText v-model="filters['global'].value" placeholder="Keyword Search" />
+            </IconField>
+          </div>
+        </template>
+
+        <!-- Date Column -->
+        <Column field="date" header="Date">
+          <template #filter="{ filterModel }">
+            <DatePicker v-model="filterModel.value" dateFormat="mm/dd/yy" placeholder="mm/dd/yyyy" />
+          </template>
+        </Column>
+
+        <!-- Description Column -->
+        <Column field="description" header="Description">
+          <template #filter="{ filterModel }">
+            <InputText v-model="filterModel.value" placeholder="Search by description" />
+          </template>
+        </Column>
+
+        <!-- Amount Column -->
+        <Column field="amount" header="Amount">
+          <template #filter="{ filterModel }">
+            <InputNumber v-model="filterModel.value" mode="currency" currency="USD" locale="en-US" />
+          </template>
+        </Column>
+
+        <!-- Ignore Action Column -->
+        <Column header="Ignore">
+          <template #body="slotProps">
+            <RadioButton v-model="slotProps.data.action" value="Ignore"
+              @change="handleActionChange(slotProps.data, 'Ignore')" />
+          </template>
+        </Column>
+
+        <!-- Split 50/50 Action Column -->
+        <Column header="Split 50/50">
+          <template #body="slotProps">
+            <RadioButton v-model="slotProps.data.action" value="Split 50/50"
+              @change="handleActionChange(slotProps.data, 'Split 50/50')" />
+          </template>
+        </Column>
+
+        <!-- Charge only Person1 Column -->
+        <Column :header="`Charge only ${data.person1}`">
+          <template #body="slotProps">
+            <RadioButton v-model="slotProps.data.action" :value="`Charge only ${data.person1}`"
+              @change="handleActionChange(slotProps.data, `Charge only ${data.person1}`)" />
+          </template>
+        </Column>
+
+        <!-- Charge only Person2 Column -->
+        <Column :header="`Charge only ${data.person2}`">
+          <template #body="slotProps">
+            <RadioButton v-model="slotProps.data.action" :value="`Charge only ${data.person2}`"
+              @change="handleActionChange(slotProps.data, `Charge only ${data.person2}`)" />
+          </template>
+        </Column>
+
+      </DataTable>
+
+      <button @click="submitResults" class="submit-button">Submit Results</button>
     </div>
 
-    <button @click="submitResults" class="submit-button">Submit Results</button>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRuntimeConfig, useFetch } from '#imports'
+import RadioButton from 'primevue/radiobutton';
 
 const route = useRoute()
 const config = useRuntimeConfig()
 const groupId = route.params.id
+const toast = useToast();
 
 const { data, pending, error } = useFetch(`${config.public.apiBaseUrl}/groups/${groupId}`, {
   onRequest({ request, options }) {
@@ -192,14 +221,15 @@ const { data, pending, error } = useFetch(`${config.public.apiBaseUrl}/groups/${
   }
 })
 
-
 const activeFile = ref(0)
-const selectedOwner = ref(null)
+const uploadOwner = ref({})
+const selectedOwner = ref('')
 const selectedFile = ref(null)
 const uploadPending = ref(false)
 const uploadError = ref(null)
 const transactions = ref([])
 const files = ref([])
+const fileupload = ref();
 
 const balancePerson1 = ref(0)
 const balancePerson2 = ref(0)
@@ -207,31 +237,40 @@ const balancePerson2 = ref(0)
 const fileBalancePerson1 = ref(0)
 const fileBalancePerson2 = ref(0)
 
+const filters = ref({});
+const loading = ref(false);
+
 let originalTransactions = []
 
-const handleFileChange = (event) => {
-  selectedFile.value = event.target.files[0];
-}
+// Owners dropdown options
+// Computed property to generate owner options for Select component
+const owners = computed(() => {
+  if (data.value) {
+    return [
+      { name: data.value.person1, value: data.value.person1 },
+      { name: data.value.person2, value: data.value.person2 }
+    ];
+  }
+  return [];
+});
 
-const selectFile = (file) => {
-  selectedFile.value = file;  // Set the selected file
-  selectedOwner.value = file.owner;  // Set the owner based on the selected file
-  fetchTransactions(file.id);  // Fetch transactions for the selected file
+const handleFileChange = (event) => {
+  selectedFile.value = event.files[0];
 };
 
-
 const uploadFile = async () => {
-  if (!selectedFile.value || !selectedOwner.value) {
+  if (!selectedFile.value || !uploadOwner.value) {
     return;
   }
 
   const formData = new FormData();
   formData.append('file', selectedFile.value);
-  formData.append('owner', selectedOwner.value);
+  formData.append('owner', uploadOwner.value.value);
 
   try {
     uploadPending.value = true;
     uploadError.value = null;
+
     const response = await fetch(`${config.public.apiBaseUrl}/groups/${groupId}/upload`, {
       method: 'POST',
       body: formData,
@@ -240,16 +279,79 @@ const uploadFile = async () => {
     if (response.ok) {
       await fetchFiles(); // Refresh the list of files
       await fetchGroupBalance(); // Refresh the group balance
-      // Notify the user that the upload was successful
-      alert('File uploaded successfully!');
+      toast.add({ severity: 'info', summary: 'Success', detail: 'File uploaded successfully!', life: 3000 });
     } else {
       throw new Error('Error uploading file');
     }
   } catch (err) {
     console.error('Error uploading file:', err);
     uploadError.value = 'Error uploading file';
+    toast.add({ severity: 'error', summary: 'Upload Failed', detail: 'Error uploading file', life: 3000 });
   } finally {
     uploadPending.value = false;
+    fileupload.value.clear(); // Clear the FileUpload component after upload
+  }
+};
+
+const onUpload = () => {
+  uploadFile();
+};
+
+const selectFile = (file) => {
+  selectedFile.value = file;  // Set the selected file
+  selectedOwner.value = file.owner;  // Set the owner based on the selected file
+  fetchTransactions(file.id);  // Fetch transactions for the selected file
+};
+
+const initFilters = () => {
+  filters.value = {
+    global: { value: null, matchMode: 'contains' },
+    date: { value: null, matchMode: 'equals' },
+    description: { value: null, matchMode: 'contains' },
+    amount: { value: null, matchMode: 'equals' },
+  };
+};
+
+const clearFilter = () => {
+  initFilters();
+};
+
+const onRowSelect = (event) => {
+  fetchTransactions(event.data); // Handle the selected row action
+};
+
+const onRowUnselect = () => {
+  selectedFile.value = null
+  selectedOwner.value = ''
+  fetchTransactions(null)
+}
+
+const confirmDeleteFile = (file) => {
+  if (confirm(`Are you sure you want to delete the file: ${file.name}? This action cannot be undone.`)) {
+    deleteFile(file);
+  }
+};
+
+const deleteFile = async (file) => {
+  try {
+    const response = await fetch(`${config.public.apiBaseUrl}/groups/${groupId}/files/${file.id}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      // Remove the file from the files array
+      files.value = files.value.filter(f => f.id !== file.id);
+
+      await fetchGroupBalance()
+
+      // Show a success message
+      toast.add({ severity: 'success', summary: 'Success', detail: 'File deleted successfully', life: 3000 });
+    } else {
+      throw new Error('Failed to delete file.');
+    }
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete file.', life: 3000 });
   }
 };
 
@@ -297,7 +399,7 @@ const queryPastSelections = async () => {
       return transaction;
     });
 
-    alert('Actions auto-filled based on past selections for the same owner!');
+    alert('Auto-filled actions based on previous files.');
   } catch (error) {
     console.error('Error querying past actions:', error);
     alert('Failed to auto-fill actions.');
@@ -329,7 +431,9 @@ const fetchGroupBalance = async () => {
 const fetchTransactions = async (file) => {
   try {
     if (!file) {
-      throw new Error("No file selected. Please select a file to view transactions.");
+      console.log("No file selected. Please select a file to view transactions.");
+      transactions.value = [];
+      return
     }
     activeFile.value = file.id
     selectedFile.value = file; // Set the selected file here
@@ -358,7 +462,6 @@ const fetchTransactions = async (file) => {
     transactions.value = [];
   }
 }
-
 
 const handleActionChange = (transaction, newAction) => {
 
@@ -485,9 +588,11 @@ async function submitResults() {
 
     // Refresh the group balance after submission
     await fetchGroupBalance();
+    await fetchFiles();
 
     // Notify submission was successful
-    alert('Submission completed successfully!');
+    // alert('Submission completed successfully!');
+    toast.add({ severity: 'info', summary: 'Success', detail: 'Transactions submitted successfully!', life: 4000 });
 
   } catch (error) {
     console.error('Error submitting results:', error);
@@ -496,6 +601,8 @@ async function submitResults() {
   }
 }
 
+
+
 onMounted(() => {
   // console.log('Data on mount: ', data) 
   fetchFiles()
@@ -503,6 +610,10 @@ onMounted(() => {
   if (files.value.length > 0) {
     selectFile(files.value[0]);
   }
+  initFilters();
+
+  // Mock data fetching here
+  loading.value = false;
 })
 </script>
 
@@ -511,11 +622,12 @@ onMounted(() => {
 
 .group-details,
 .upload-section,
-.uploaded-files-section {
+.uploaded-files-section,
+.transactions-section {
   background-color: #ffffff;
   padding: 20px;
   border-radius: 10px;
-  max-width: 600px;
+  width: 90%;
   margin: 20px auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -565,6 +677,30 @@ onMounted(() => {
 
 .file-list button {
   margin-top: 10px;
+}
+
+.upload-section {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 600px;
+  margin: 20px auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.file-upload,
+.dropdown {
+  width: 100%;
 }
 
 .file-button {
@@ -630,7 +766,8 @@ table {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-th, td {
+th,
+td {
   padding: 12px 15px;
   border: 1px solid #ddd;
   text-align: left;
@@ -659,6 +796,89 @@ td {
 .form-actions {
   margin-top: 20px;
   text-align: center;
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-container i {
+  font-size: 1.2rem;
+}
+
+.search-container input {
+  width: 100%;
+  max-width: 300px;
+}
+
+.transactions-section {
+  margin-top: 20px;
+}
+
+.balance-item {
+  margin: 10px 0;
+}
+
+.button-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.p-button-secondary {
+  background-color: #0878cd;
+  border: 5px;
+  color: white;
+}
+
+/* .p-button-danger {
+  background-color: #d9534f;
+  border: none;
+}  */
+
+.button-actions .p-button {
+  width: 100%;
+  max-width: 300px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.file-upload-wrapper,
+.owner-select-wrapper,
+.upload-button-wrapper {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.file-upload-wrapper {
+  max-width: 400px;
+}
+
+.owner-select-wrapper {
+  max-width: 200px;
+}
+
+.upload-button-wrapper {
+  max-width: 150px;
 }
 
 </style>

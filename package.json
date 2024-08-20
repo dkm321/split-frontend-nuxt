@@ -11,8 +11,14 @@
   },
   "dependencies": {
     "@nuxtjs/axios": "^5.13.6",
+    "@primevue/themes": "^4.0.4",
     "@types/axios": "^0.14.0",
     "nuxt": "^3.12.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.0.4",
     "vue": "latest"
+  },
+  "devDependencies": {
+    "@primevue/nuxt-module": "^4.0.4"
   }
 }
