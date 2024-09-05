@@ -14,7 +14,7 @@
       <input v-model="newGroupName" placeholder="Group Name" required />
       <input v-model="newPerson1" placeholder="Person 1" required />
       <input v-model="newPerson2" placeholder="Person 2" required />
-      <Button label="Check" icon="pi pi-check" @click="createGroup"/>
+      <Button label="Create" icon="pi pi-check" @click="createGroup"/>
 
     </form>
   </div>

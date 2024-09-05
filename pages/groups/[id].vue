@@ -43,12 +43,90 @@
     </div>
 
     <!-- Files Section -->
-    <div class="uploaded-files-section">
+    <div class="files-section">
       <h2>Files</h2>
-      <div v-if="data" class="card flex gap-4 items-center justify-between flex-wrap">
+
+      <div>
+        <Toast />
+        <FileUpload name="file" ref="uploadingFiles" @upload="onTemplatedUpload($event)" :multiple="true" accept=".csv" :maxFileSize="1000000" @select="onSelectedFiles"
+          chooseLabel="Choose CSV File">
+          <template #header="{ chooseCallback, uploadCallback, clearCallback, files }">
+            <div>
+              <h3>Upload</h3>
+            </div>
+            <div class="flex flex-wrap justify-between items-center flex-1 gap-4">
+              <div>
+                <Select v-model="uploadOwner" :options="owners" optionLabel="name" placeholder="Select Owner"
+                  :disabled="uploadPending" />
+
+                <Button @click="chooseCallback" icon="pi pi-images" rounded outlined severity="info"></Button>
+
+                <Button @click="uploadEvent(uploadCallback)" icon="pi pi-cloud-upload" rounded outlined
+                  severity="success" :disabled="!files || files.length === 0 || !uploadOwner"></Button>
+
+                <Button @click="clearCallback()" icon="pi pi-times" rounded outlined severity="danger"
+                  :disabled="!files || files.length === 0"></Button>
+
+              </div>
+            </div>
+
+          </template>
+
+          <template #content="{ files, uploadedFiles, removeUploadedFileCallback, removeFileCallback }">
+            <div class="flex flex-col gap-8 pt-4">
+              <div v-if="files.length > 0">
+                <h5>Pending</h5>
+                <div class="flex flex-wrap gap-4">
+                  <div v-for="(file, index) of files" :key="file.name + file.type + file.size"
+                    class="p-8 rounded-border flex flex-col border border-surface items-center gap-4">
+                    <!-- <div>
+                      <img role="presentation" :alt="file.name" :src="file.objectURL" width="100" height="50" />
+                    </div> -->
+                    <span class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden">{{ file.name
+                      }}</span>
+                    <!-- <div>{{ formatSize(file.size) }}</div> -->
+                    <Badge value="Pending" severity="warn" />
+                    <Button icon="pi pi-times" @click="onRemoveTemplatingFile(file, removeFileCallback, index)" outlined
+                      rounded severity="danger" />
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="uploadedFiles.length > 0">
+                <h5>Completed</h5>
+                <div class="flex flex-wrap gap-4">
+                  <div v-for="(file, index) of uploadedFiles" :key="file.name + file.type + file.size"
+                    class="p-8 rounded-border flex flex-col border border-surface items-center gap-4">
+                    <!-- <div>
+                      <img role="presentation" :alt="file.name" :src="file.objectURL" width="100" height="50" />
+                    </div> -->
+                    <span class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden">{{ file.name
+                      }}</span>
+                    <!-- <div>{{ formatSize(file.size) }}</div> -->
+                    <Badge value="Completed" class="mt-4" severity="success" />
+                    <Button icon="pi pi-times" @click="removeUploadedFileCallback(index)" outlined rounded
+                      severity="danger" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="flex items-center justify-center flex-col">
+              <i class="pi pi-cloud-upload !border-2 !rounded-full !p-8 !text-4xl !text-muted-color" />
+              <p class="mt-6 mb-0">Drag and drop files to here to upload.</p>
+            </div>
+          </template>
+
+        </FileUpload>
+      </div>
+
+      <!-- <div v-if="data" class="card flex gap-4 items-center justify-between flex-wrap upload-section">
+        <h3>Upload New File:</h3>
         <Toast />
 
-        <!-- File Upload Section -->
+
         <div class="flex-1">
           <div class="file-upload-wrapper">
             <FileUpload ref="fileupload" mode="basic" name="file" :customUpload="true" accept=".csv" :auto="false"
@@ -57,7 +135,7 @@
           </div>
         </div>
 
-        <!-- Owner Selection Dropdown -->
+
         <div class="flex-1">
           <div class="owner-select-wrapper">
             <Select v-model="uploadOwner" :options="owners" optionLabel="name" placeholder="Select Owner"
@@ -65,18 +143,18 @@
           </div>
         </div>
 
-        <!-- Upload Button -->
+
         <div class="flex-1">
           <div class="upload-button-wrapper">
             <Button label="Upload File" @click="uploadFile" severity="secondary"
-              :disabled="!selectedFile || !uploadOwner || uploadPending" />
+              :disabled="!selectedFile || !uploadOwner || uploadPending" 
+            />
           </div>
         </div>
-      </div>
-
+      </div> -->
 
       <div v-if="data && data.person1 && data.person2">
-        <DataTable :value="files" tableStyle="min-width: 50rem" responsiveLayout="scroll" selectionMode="single"
+        <DataTable :value="groupFiles" tableStyle="min-width: 50rem" responsiveLayout="scroll" selectionMode="single"
           v-model:selection="selectedFile" @rowSelect="onRowSelect" @rowUnselect="onRowUnselect">
           <Column field="id" header="ID"></Column>
           <Column field="name" header="File Name"></Column>
@@ -86,11 +164,7 @@
           <Column field="balance_person2" :header="`${data.person2}'s Balance`"></Column>
           <Column header="Actions">
             <template #body="slotProps">
-              <Button 
-                icon="pi pi-trash" 
-                class="p-button-danger" 
-                @click="confirmDeleteFile(slotProps.data)"
-              />
+              <Button icon="pi pi-trash" class="p-button-danger" @click="confirmDeleteFile(slotProps.data)" />
             </template>
           </Column>
         </DataTable>
@@ -222,14 +296,15 @@ const { data, pending, error } = useFetch(`${config.public.apiBaseUrl}/groups/${
 })
 
 const activeFile = ref(0)
-const uploadOwner = ref({})
+const uploadOwner = ref(null)
 const selectedOwner = ref('')
 const selectedFile = ref(null)
 const uploadPending = ref(false)
 const uploadError = ref(null)
 const transactions = ref([])
-const files = ref([])
-const fileupload = ref();
+let uploadingFiles = ref([])
+const groupFiles = ref([])
+// const fileupload = ref(null);
 
 const balancePerson1 = ref(0)
 const balancePerson2 = ref(0)
@@ -254,17 +329,17 @@ const owners = computed(() => {
   return [];
 });
 
-const handleFileChange = (event) => {
-  selectedFile.value = event.files[0];
-};
 
-const uploadFile = async () => {
-  if (!selectedFile.value || !uploadOwner.value) {
+const uploadFile = async (file) => {
+  console.log('Uploading file.....')
+  console.log('Files: ', file)
+
+  if (!file || !uploadOwner.value) {
     return;
   }
 
   const formData = new FormData();
-  formData.append('file', selectedFile.value);
+  formData.append('file', file);
   formData.append('owner', uploadOwner.value.value);
 
   try {
@@ -289,8 +364,32 @@ const uploadFile = async () => {
     toast.add({ severity: 'error', summary: 'Upload Failed', detail: 'Error uploading file', life: 3000 });
   } finally {
     uploadPending.value = false;
-    fileupload.value.clear(); // Clear the FileUpload component after upload
+    // fileupload.value.clear(); // Clear the FileUpload component after upload
   }
+};
+
+const onRemoveTemplatingFile = (file, removeFileCallback, index) => {
+    removeFileCallback(index);
+};
+
+const onClearTemplatingUpload = (clear) => {
+    clear();
+};
+
+const onSelectedFiles = (event) => {
+    uploadingFiles.value = event.files;
+};
+
+const uploadEvent = (callback) => {
+    callback();
+};
+
+const onTemplatedUpload = () => {
+    uploadingFiles.value.forEach(file => {
+      uploadFile(file);
+    })
+    // toast.add({ severity: "info", summary: "Success", detail: "File Uploaded", life: 3000 });
+    uploadingFiles = []
 };
 
 const onUpload = () => {
@@ -326,6 +425,21 @@ const onRowUnselect = () => {
   fetchTransactions(null)
 }
 
+// const formatSize = (bytes) => {
+//     const k = 1024;
+//     const dm = 3;
+//     const sizes = $primevue.config.locale.fileSizeTypes;
+
+//     if (bytes === 0) {
+//         return `0 ${sizes[0]}`;
+//     }
+
+//     const i = Math.floor(Math.log(bytes) / Math.log(k));
+//     const formattedSize = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+
+//     return `${formattedSize} ${sizes[i]}`;
+// };
+
 const confirmDeleteFile = (file) => {
   if (confirm(`Are you sure you want to delete the file: ${file.name}? This action cannot be undone.`)) {
     deleteFile(file);
@@ -340,7 +454,7 @@ const deleteFile = async (file) => {
 
     if (response.ok) {
       // Remove the file from the files array
-      files.value = files.value.filter(f => f.id !== file.id);
+      groupFiles.value = groupFiles.value.filter(f => f.id !== file.id);
 
       await fetchGroupBalance()
 
@@ -411,7 +525,7 @@ const fetchFiles = async () => {
     const response = await fetch(`${config.public.apiBaseUrl}/groups/${groupId}/files`)
     const data = await response.json()
     console.log('Files fetched successfully:', data)
-    files.value = data
+    groupFiles.value = data
   } catch (err) {
     console.error('Error fetching files:', err)
   }
@@ -607,8 +721,8 @@ onMounted(() => {
   // console.log('Data on mount: ', data) 
   fetchFiles()
   fetchGroupBalance()
-  if (files.value.length > 0) {
-    selectFile(files.value[0]);
+  if (groupFiles.value.length > 0) {
+    selectFile(groupFiles.value[0]);
   }
   initFilters();
 
@@ -621,8 +735,7 @@ onMounted(() => {
 /* Existing styles */
 
 .group-details,
-.upload-section,
-.uploaded-files-section,
+.files-section,
 .transactions-section {
   background-color: #ffffff;
   padding: 20px;
@@ -658,44 +771,13 @@ onMounted(() => {
   font-weight: bold;
 }
 
-.upload-form,
-.file-list {
-  width: 100%;
-}
-
-/* Center and align the form */
-.upload-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: center;
-}
-
-.file-list button {
-  margin-top: 10px;
-}
-
 .upload-section {
   background-color: #ffffff;
   padding: 20px;
   border-radius: 10px;
-  max-width: 600px;
+  width: 100%;
   margin: 20px auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
 }
 
 .file-upload,
@@ -703,37 +785,9 @@ onMounted(() => {
   width: 100%;
 }
 
-.file-button {
-  padding: 12px 15px;
-  background-color: #f9f9f9;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  width: 90%;
-  transition: background-color 0.3s ease;
-}
-
-.file-button:hover {
-  background-color: #e3f2fd;
-}
-
 .selected-file {
   background-color: #007bff;
   color: white;
-}
-
-.table-container {
-  margin-top: 20px;
-  background-color: #f9f9f9;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: white;
-  margin-top: 10px;
 }
 
 .submit-button {
@@ -753,34 +807,12 @@ table {
   background-color: #0056b3;
 }
 
-.table-container {
-  overflow-x: auto;
-  margin-top: 20px;
-}
-
 .file-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
   background-color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-th,
-td {
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-
-th {
-  background-color: #007bff;
-  color: white;
-  text-align: center;
-}
-
-td {
-  text-align: center;
 }
 
 .file-row:hover {
@@ -791,11 +823,6 @@ td {
 .selected-file {
   background-color: #007bff72 !important;
   color: white;
-}
-
-.form-actions {
-  margin-top: 20px;
-  text-align: center;
 }
 
 .header-container {
@@ -880,5 +907,4 @@ td {
 .upload-button-wrapper {
   max-width: 150px;
 }
-
 </style>

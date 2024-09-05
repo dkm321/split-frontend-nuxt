@@ -6,7 +6,7 @@ export default ({
   devtools: { enabled: true },  
   runtimeConfig: {
     public: {
-      apiBaseUrl: 'http://localhost:8000', // Your FastAPI backend URL
+      apiBaseUrl: 'http://10.0.0.74:8000', // Your FastAPI backend URL
     }
   },
   modules: [
@@ -24,5 +24,10 @@ export default ({
             }
         }
     }
-}
+  },
+  server: {
+    host: '0.0.0.0',  // Bind Nuxt to all available network interfaces
+    port: 3000         // Port for Nuxt app, change if needed
+  }
+
 })
