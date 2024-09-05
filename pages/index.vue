@@ -6,6 +6,12 @@
     <ul v-if="data && data.length">
       <li v-for="group in data" :key="group.id">
         <NuxtLink :to="`/groups/${group.id}`">{{ group.name }}</NuxtLink>
+        <Button 
+          label="Delete" 
+          icon="pi pi-trash" 
+          class="p-button-danger p-button-text" 
+          @click="hideGroup(group.id)" 
+        />
       </li>
     </ul>
     
@@ -24,6 +30,7 @@
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+const toast = useToast();
 const config = useRuntimeConfig()
 const newGroupName = ref('')
 const newPerson1 = ref('')
@@ -49,6 +56,8 @@ const createGroup = async () => {
         name: newGroupName.value,
         person1: newPerson1.value,
         person2: newPerson2.value,
+        is_hidden: false,
+        is_archived: false
       }
     })
     newGroupName.value = ''
@@ -59,6 +68,28 @@ const createGroup = async () => {
     console.error('Error creating group:', err)
   }
 }
+
+  const hideGroup = async (groupId) => {
+    try {
+      const response = await fetch(`${config.public.apiBaseUrl}/groups/${groupId}/hide`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        // Show success message
+        toast.add({ severity: 'info', summary: 'Success', detail: 'Group deleted successfully', life: 3000 });
+        
+        // Refresh the list of groups
+        await refresh();
+      } else {
+        throw new Error('Failed to delete group');
+      }
+    } catch (error) {
+      console.error('Error hiding group:', error);
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete group', life: 3000 });
+    }
+  }
+
 
 // Add a watcher to refresh the data when the route changes
 watch(() => useRoute().path, async (newPath, oldPath) => {
