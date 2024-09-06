@@ -372,9 +372,6 @@ const onRemoveTemplatingFile = (file, removeFileCallback, index) => {
     removeFileCallback(index);
 };
 
-const onClearTemplatingUpload = (clear) => {
-    clear();
-};
 
 const onSelectedFiles = (event) => {
     uploadingFiles.value = event.files;
@@ -390,10 +387,6 @@ const onTemplatedUpload = () => {
     })
     // toast.add({ severity: "info", summary: "Success", detail: "File Uploaded", life: 3000 });
     uploadingFiles = []
-};
-
-const onUpload = () => {
-  uploadFile();
 };
 
 const selectFile = (file) => {
@@ -424,21 +417,6 @@ const onRowUnselect = () => {
   selectedOwner.value = ''
   fetchTransactions(null)
 }
-
-// const formatSize = (bytes) => {
-//     const k = 1024;
-//     const dm = 3;
-//     const sizes = $primevue.config.locale.fileSizeTypes;
-
-//     if (bytes === 0) {
-//         return `0 ${sizes[0]}`;
-//     }
-
-//     const i = Math.floor(Math.log(bytes) / Math.log(k));
-//     const formattedSize = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
-
-//     return `${formattedSize} ${sizes[i]}`;
-// };
 
 const confirmDeleteFile = (file) => {
   if (confirm(`Are you sure you want to delete the file: ${file.name}? This action cannot be undone.`)) {
